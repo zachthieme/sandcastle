@@ -5,11 +5,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { resolveEnv } from "./EnvResolver.js";
+import { resolveStateDir } from "./resolveCwd.js";
 
 const makeDir = async () => mkdtemp(join(tmpdir(), "env-resolver-"));
 
-const runResolveEnv = async (dir: string) =>
-  Effect.runPromise(resolveEnv(dir).pipe(Effect.provide(NodeContext.layer)));
+// `resolveEnv` takes an already-resolved absolute state dir, so the test helper
+// resolves it the same way the entry points do.
+const runResolveEnv = (dir: string, stateDir = ".sandcastle") =>
+  Effect.runPromise(
+    resolveEnv(resolveStateDir(dir, stateDir)).pipe(
+      Effect.provide(NodeContext.layer),
+    ),
+  );
 
 describe("resolveEnv", () => {
   it("returns all key-value pairs from .sandcastle/.env", async () => {
@@ -100,6 +107,26 @@ describe("resolveEnv", () => {
     const dir = await makeDir();
     const env = await runResolveEnv(dir);
     expect(env).toStrictEqual({});
+  });
+
+  it("reads .env from a custom relative stateDir", async () => {
+    const dir = await makeDir();
+    await mkdir(join(dir, ".mytool.local"));
+    await writeFile(
+      join(dir, ".mytool.local", ".env"),
+      "CUSTOM_KEY=custom-val\n",
+    );
+    // The default .sandcastle dir does not exist, so only the override resolves.
+    const env = await runResolveEnv(dir, ".mytool.local");
+    expect(env).toEqual({ CUSTOM_KEY: "custom-val" });
+  });
+
+  it("reads .env from an absolute stateDir, ignoring the repo dir", async () => {
+    const repoDir = await makeDir();
+    const stateDir = await makeDir();
+    await writeFile(join(stateDir, ".env"), "ABS_KEY=abs-val\n");
+    const env = await runResolveEnv(repoDir, stateDir);
+    expect(env).toEqual({ ABS_KEY: "abs-val" });
   });
 
   it("ignores comments and blank lines in .sandcastle/.env", async () => {

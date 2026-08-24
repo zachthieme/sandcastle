@@ -1,6 +1,7 @@
 import { FileSystem } from "@effect/platform";
 import { Effect, Option, Schema } from "effect";
 import { dirname, join } from "node:path";
+import { DEFAULT_STATE_DIR } from "./resolveCwd.js";
 import { fileURLToPath } from "node:url";
 import { InitError } from "./errors.js";
 import { SANDBOX_REPO_DIR } from "./SandboxFactory.js";
@@ -1236,7 +1237,7 @@ export const scaffold = (
       imageName,
     } = options;
     const fs = yield* FileSystem.FileSystem;
-    const configDir = join(repoDir, ".sandcastle");
+    const configDir = join(repoDir, DEFAULT_STATE_DIR);
 
     const exists = yield* fs
       .exists(configDir)
